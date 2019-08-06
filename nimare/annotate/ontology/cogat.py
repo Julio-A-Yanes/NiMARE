@@ -3,6 +3,7 @@ Automated annotation of Cognitive Atlas labels.
 """
 import re
 import time
+import os.path as op
 
 import numpy as np
 import pandas as pd
@@ -12,7 +13,9 @@ from cognitiveatlas.api import get_task
 from cognitiveatlas.api import get_disorder
 
 from ..text import uk_to_us
-from ...due import due, Doi
+from ...due import due
+from ...utils import get_resource_path
+from ... import references
 
 
 def _longify(df):
@@ -55,7 +58,7 @@ def _gen_alt_forms(term):
     alt_forms = []
     # For one alternate form, put contents of parentheses at beginning of term
     if '(' in term:
-        prefix = term[term.find('(')+1:term.find(')')]
+        prefix = term[term.find('(') + 1:term.find(')')]
         temp_term = term.replace('({0})'.format(prefix), '').replace('  ', ' ')
         alt_forms.append(temp_term)
         alt_forms.append('{0} {1}'.format(prefix, temp_term))
@@ -272,11 +275,10 @@ def _generate_weights(rel_df, weights):
     return expanded_df
 
 
-@due.dcite(Doi('10.3389/fninf.2011.00017'),
-           description='Introduces the Cognitive Atlas.')
+@due.dcite(references.COGNITIVE_ATLAS, description='Introduces the Cognitive Atlas.')
 class CogAtLemmatizer(object):
     """
-    Replace synonyms and abbreviations with Cognitive Atlas identifiers in
+    Replace synonyms and abbreviations with Cognitive Atlas [1]_ identifiers in
     text.
 
     Parameters
@@ -293,6 +295,12 @@ class CogAtLemmatizer(object):
     regex : :obj:`dict`
         Dictionary linking aliases in ontology to regular expressions for
         lemmatization.
+
+    References
+    ----------
+    .. [1] Poldrack, Russell A., et al. "The cognitive atlas: toward a
+        knowledge foundation for cognitive neuroscience." Frontiers in
+        neuroinformatics 5 (2011): 17. https://doi.org/10.3389/fninf.2011.00017
     """
     def __init__(self, ontology_df=None):
         if ontology_df is None:
@@ -309,8 +317,8 @@ class CogAtLemmatizer(object):
         # Create regex dictionary
         regex_dict = {}
         for term in ontology_df['alias'].values:
-            term_for_regex = term.replace('(', '\(').replace(')', '\)')
-            regex = '\\b'+term_for_regex+'\\b'
+            term_for_regex = term.replace('(', r'\(').replace(')', r'\)')
+            regex = '\\b' + term_for_regex + '\\b'
             pattern = re.compile(regex, re.MULTILINE | re.IGNORECASE)
             regex_dict[term] = pattern
         self.regex = regex_dict
@@ -343,11 +351,10 @@ class CogAtLemmatizer(object):
         return text
 
 
-@due.dcite(Doi('10.3389/fninf.2011.00017'),
-           description='Introduces the Cognitive Atlas.')
+@due.dcite(references.COGNITIVE_ATLAS, description='Introduces the Cognitive Atlas.')
 def extract_cogat(text_df, id_df):
     """
-    Extract CogAt terms and perform hierarchical expansion.
+    Extract Cognitive Atlas [1]_ terms and perform hierarchical expansion.
 
     Parameters
     ----------
@@ -365,6 +372,12 @@ def extract_cogat(text_df, id_df):
         Term counts for documents in the corpus.
     rep_text_df : (D x 2) :obj:`pandas.DataFrame`
         Text DataFrame with terms replaced with their CogAt IDs.
+
+    References
+    ----------
+    .. [1] Poldrack, Russell A., et al. "The cognitive atlas: toward a
+        knowledge foundation for cognitive neuroscience." Frontiers in
+        neuroinformatics 5 (2011): 17. https://doi.org/10.3389/fninf.2011.00017
     """
     gazetteer = sorted(id_df['id'].unique().tolist())
     if 'id' in text_df.columns:
@@ -373,8 +386,8 @@ def extract_cogat(text_df, id_df):
     # Create regex dictionary
     regex_dict = {}
     for term in id_df['alias'].values:
-        term_for_regex = term.replace('(', '\(').replace(')', '\)')
-        regex = '\\b'+term_for_regex+'\\b'
+        term_for_regex = term.replace('(', r'\(').replace(')', r'\)')
+        regex = '\\b' + term_for_regex + '\\b'
         pattern = re.compile(regex, re.MULTILINE | re.IGNORECASE)
         regex_dict[term] = pattern
 
@@ -404,7 +417,7 @@ def extract_cogat(text_df, id_df):
 
 def expand_counts(counts_df, rel_df, weights=None):
     """
-    Perform hierarchical expansion of CogAt labels.
+    Perform hierarchical expansion of counts across labels.
 
     Parameters
     ----------

@@ -3,25 +3,27 @@ Methods for decoding unthresholded brain maps into text.
 """
 import numpy as np
 import pandas as pd
+import nibabel as nib
 from nilearn.masking import apply_mask
 
-from ..base import Decoder
-from ..meta.cbma import MKDAChi2, MKDAKernel
-from ..due import due, Doi
+from .utils import weight_priors
+from ..meta.cbma import MKDAChi2
+from ..due import due
+from .. import references
 
 
-@due.dcite(Doi('10.1371/journal.pcbi.1005649'),
+@due.dcite(references.GCLDA_DECODING,
            description='Describes decoding methods using GC-LDA.')
-def gclda_decode_map(model, roi, topic_priors=None, prior_weight=1):
-    """
+def gclda_decode_map(model, image, topic_priors=None, prior_weight=1):
+    r"""
     Perform image-to-text decoding for continuous inputs (e.g.,
-    unthresholded statistical maps).
+    unthresholded statistical maps), according to the method described in [1]_.
 
     Parameters
     ----------
-    model : :obj:`gclda.model.Model`
+    model : :obj:`nimare.annotate.topic.GCLDAModel`
         Model object needed for decoding.
-    image : :obj:`nibabel.nifti.Nifti1Image` or :obj:`str`
+    image : :obj:`nibabel.nifti1.Nifti1Image` or :obj:`str`
         Whole-brain image to decode into text. Must be in same space as
         model and dataset. Model's template available in
         `model.dataset.mask_img`.
@@ -66,6 +68,13 @@ def gclda_decode_map(model, roi, topic_priors=None, prior_weight=1):
             - :math:`p(w|i) \propto \\tau_{t} \cdot p(w|t)`
     5.  The resulting vector (``word_weights``) reflects arbitrarily scaled
         term weights for the input image.
+
+    References
+    ----------
+    .. [1] Rubin, Timothy N., et al. "Decoding brain activity using a
+        large-scale probabilistic functional-anatomical atlas of human
+        cognition." PLoS computational biology 13.10 (2017): e1005649.
+        https://doi.org/10.1371/journal.pcbi.1005649
     """
     if isinstance(image, str):
         image = nib.load(image)
@@ -87,14 +96,13 @@ def gclda_decode_map(model, roi, topic_priors=None, prior_weight=1):
     # p_word_g_topic = np.nan_to_num(p_word_g_topic, 0)
     word_weights = np.dot(model.p_word_g_topic, topic_weights)
 
-    decoded_df = pd.DataFrame(index=model.word_labels,
+    decoded_df = pd.DataFrame(index=model.vocabulary,
                               columns=['Weight'], data=word_weights)
     decoded_df.index.name = 'Term'
     return decoded_df, topic_weights
 
 
-@due.dcite(Doi('10.1038/nmeth.1635'),
-           description='Introduces Neurosynth.')
+@due.dcite(references.NEUROSYNTH, description='Introduces Neurosynth.')
 def corr_decode(img, dataset, features=None, frequency_threshold=0.001,
                 meta_estimator=None, target_image='specificity_z'):
     """
@@ -117,6 +125,12 @@ def corr_decode(img, dataset, features=None, frequency_threshold=0.001,
     target_image : :obj:`str`, optional
         Image from ``meta_estimator``'s results to use for decoding.
         Dependent on estimator.
+
+    Returns
+    -------
+    out_df : :obj:`pandas.DataFrame`
+        A DataFrame with two columns: 'feature' (label) and 'r' (correlation
+        coefficient). There will be one row for each feature.
     """
     # Check that input image is compatible with dataset
     assert np.array_equal(img.affine, dataset.mask.affine)

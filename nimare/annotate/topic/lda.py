@@ -11,34 +11,21 @@ import pandas as pd
 
 from ...base import AnnotationModel
 from ...utils import get_resource_path
-from ...due import due, BibTeX, Doi
+from ...due import due
+from ... import references
 
 LGR = logging.getLogger(__name__)
 
 
-@due.dcite(BibTeX("""
-    @article{blei2003latent,
-      title={Latent dirichlet allocation},
-      author={Blei, David M and Ng, Andrew Y and Jordan, Michael I},
-      journal={Journal of machine Learning research},
-      volume={3},
-      number={Jan},
-      pages={993--1022},
-      year={2003}}
-    """), description='Introduces LDA.')
-@due.dcite(BibTeX("""
-    @article{mallettoolbox,
-      title={MALLET: A Machine Learning for Language Toolkit.},
-      author={McCallum, Andrew K},
-      year={2002}}
-    """), description='Citation for MALLET toolbox')
-@due.dcite(Doi('10.1371/journal.pcbi.1002707'),
+@due.dcite(references.LDA, description='Introduces LDA.')
+@due.dcite(references.MALLET, description='Citation for MALLET toolbox')
+@due.dcite(references.LDAMODEL,
            description='First use of LDA for automated annotation of '
            'neuroimaging literature.')
 class LDAModel(AnnotationModel):
     """
-    Perform topic modeling using Latent Dirichlet Allocation with the
-    Java toolbox MALLET.
+    Perform topic modeling using Latent Dirichlet Allocation [1]_ with the
+    Java toolbox MALLET [2]_, as performed in [3]_.
 
     Parameters
     ----------
@@ -58,6 +45,18 @@ class LDAModel(AnnotationModel):
     beta : :obj:`float`, optional
         The Dirichlet prior on the per-topic word distribution. Default: 0.001,
         based on Poldrack et al. (2012).
+
+    References
+    ----------
+    .. [1] Blei, David M., Andrew Y. Ng, and Michael I. Jordan. "Latent
+        dirichlet allocation." Journal of machine Learning research 3.Jan
+        (2003): 993-1022.
+    .. [2] McCallum, Andrew Kachites. "Mallet: A machine learning for language
+        toolkit." (2002).
+    .. [3] Poldrack, Russell A., et al. "Discovering relations between mind,
+        brain, and mental disorders using topic mapping." PLoS computational
+        biology 8.10 (2012): e1002707.
+        https://doi.org/10.1371/journal.pcbi.1002707
     """
     def __init__(self, text_df, n_topics=50, n_iters=1000, alpha='auto',
                  beta=0.001):
@@ -77,7 +76,7 @@ class LDAModel(AnnotationModel):
             'n_iters': n_iters,
             'alpha': alpha,
             'beta': beta,
-            }
+        }
 
         # Check for presence of text files and convert if necessary
         if not op.isdir(text_dir):

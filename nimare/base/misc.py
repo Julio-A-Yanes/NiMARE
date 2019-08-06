@@ -1,7 +1,11 @@
 """
 Miscellaneous base classes.
 """
+from .estimators import Estimator
 
-class Parcellator(object):
-    def __init__(self, dataset):
-        pass
+
+class Parcellator(Estimator):
+    """
+    Base class for meta-analytic parcellation methods.
+    """
+    pass

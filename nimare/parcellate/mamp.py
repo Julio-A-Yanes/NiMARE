@@ -9,14 +9,14 @@ from nilearn.masking import apply_mask, unmask
 
 from ..base import Parcellator
 from ..meta.cbma.kernel import ALEKernel
-from ..due import due, Doi
+from ..due import due
+from .. import references
 
 
-@due.dcite(Doi('10.1016/j.neuroimage.2015.08.027'),
-           description='Introduces the MAMP algorithm.')
+@due.dcite(references.MAMP, description='Introduces the MAMP algorithm.')
 class MAMP(Parcellator):
     """
-    Meta-analytic activation modeling-based parcellation (MAMP).
+    Meta-analytic activation modeling-based parcellation (MAMP) [1]_.
 
     Parameters
     ----------
@@ -38,6 +38,17 @@ class MAMP(Parcellator):
         5.  Convert correlation coefficients to correlation distance (1 -r)
             values.
         6.  Perform clustering on correlation distance matrix.
+
+    Warnings
+    --------
+    This method is not yet implemented.
+
+    References
+    ----------
+    .. [1] Yang, Yong, et al. "Identifying functional subdivisions in the human
+        brain using meta-analytic activation modeling-based parcellation."
+        Neuroimage 124 (2016): 300-309.
+        https://doi.org/10.1016/j.neuroimage.2015.08.027
     """
     def __init__(self, dataset, ids):
         self.mask = dataset.mask

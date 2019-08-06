@@ -1,0 +1,17 @@
+nibabel<2.3
+numpy
+scipy
+pandas
+statsmodels
+nipype
+scikit-learn
+nilearn
+duecredit
+pyneurovault
+six
+matplotlib
+nltk
+fuzzywuzzy
+cognitiveatlas
+click
+tqdm

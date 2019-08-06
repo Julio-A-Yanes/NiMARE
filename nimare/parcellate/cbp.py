@@ -10,14 +10,14 @@ from nilearn.masking import apply_mask, unmask
 
 from ..base import Parcellator
 from ..meta.cbma.ale import SCALE
-from ..due import due, Doi
+from ..due import due
+from .. import references
 
 
-@due.dcite(Doi('10.1002/hbm.22138'),
-           description='Introduces CBP.')
+@due.dcite(references.CBP, description='Introduces CBP.')
 class CoordCBP(Parcellator):
     """
-    Coordinate-based coactivation-based parcellation
+    Coordinate-based coactivation-based parcellation [1]_.
 
     Notes
     -----
@@ -31,9 +31,20 @@ class CoordCBP(Parcellator):
             identified studies.
         3.  Correlate statistical maps between voxel MACMs to generate
             n_voxels X n_voxels correlation matrix.
-        4.  Convert correlation coefficients to correlation distance (1 -r)
+        4.  Convert correlation coefficients to correlation distance (1 - r)
             values.
         5.  Perform clustering on correlation distance matrix.
+
+    Warnings
+    --------
+    This method is currently untested.
+
+    References
+    ----------
+    .. [1] Bzdok, D., Laird, A. R., Zilles, K., Fox, P. T., & Eickhoff, S. B.
+        (2013). An investigation of the structural, connectional, and
+        functional subspecialization in the human amygdala. Human brain
+        mapping, 34(12), 3247-3266. https://doi.org/10.1002/hbm.22138
     """
     def __init__(self, dataset, ids):
         self.dataset = dataset
@@ -142,6 +153,10 @@ class CoordCBP(Parcellator):
 class ImCBP(Parcellator):
     """
     Image-based coactivation-based parcellation
+
+    Warnings
+    --------
+    This method is not yet implemented.
     """
     def __init__(self, dataset, ids):
         self.mask = dataset.mask

@@ -1,19 +1,26 @@
 """
 Utilities for coordinate-based meta-analysis estimators
 """
-from scipy import ndimage
-from ...due import due, Doi
-from .peaks2maps import model_fn
-import numpy.linalg as npl
-import nibabel as nb
-import numpy as np
-from tarfile import TarFile
-from lzma import LZMAFile
+import os
+import math
+import logging
 import requests
 from io import BytesIO
-import os, math
+from tarfile import TarFile
+
+import numpy as np
+import numpy.linalg as npl
+import nibabel as nb
+from scipy import ndimage
+from lzma import LZMAFile
 from tqdm.auto import tqdm
+
+from .peaks2maps import model_fn
+from ...due import due
+from ... import references
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+LGR = logging.getLogger(__name__)
 
 
 def _get_resize_arg(target_shape):
@@ -31,13 +38,16 @@ def _get_resize_arg(target_shape):
     return target_affine, list(target_shape)
 
 
-def _get_generator(contrasts_coordinates, target_shape, affine, skip_out_of_bounds=False):
+def _get_generator(contrasts_coordinates, target_shape, affine,
+                   skip_out_of_bounds=False):
     def generator():
         for contrast in contrasts_coordinates:
             encoded_coords = np.zeros(list(target_shape))
             for real_pt in contrast:
-                vox_pt = np.rint(nb.affines.apply_affine(npl.inv(affine), real_pt)).astype(int)
-                if skip_out_of_bounds and (vox_pt[0] >= 32 or vox_pt[1] >= 32 or vox_pt[2] >= 32):
+                vox_pt = np.rint(nb.affines.apply_affine(
+                    npl.inv(affine), real_pt)).astype(int)
+                if skip_out_of_bounds and (vox_pt[0] >= 32 or
+                                           vox_pt[1] >= 32 or vox_pt[2] >= 32):
                     continue
                 encoded_coords[vox_pt[0], vox_pt[1], vox_pt[2]] = 1
             yield (encoded_coords, encoded_coords)
@@ -50,15 +60,15 @@ def _get_checkpoint_dir():
     dirs = AppDirs(appname="nimare", appauthor="neurostuff", version="1.0")
     checkpoint_dir = os.path.join(dirs.user_data_dir, "ohbm2018_model")
     if not os.path.exists(checkpoint_dir):
-        print("Downloading the model (this is a one-off operation)... ")
+        LGR.info('Downloading the model (this is a one-off operation)...')
         url = "https://zenodo.org/record/1257721/files/ohbm2018_model.tar.xz?download=1"
         # Streaming, so we can iterate over the response.
         r = requests.get(url, stream=True)
         f = BytesIO()
 
         # Total size in bytes.
-        total_size = int(r.headers.get('content-length', 0));
-        block_size = 1024*1024
+        total_size = int(r.headers.get('content-length', 0))
+        block_size = 1024 * 1024
         wrote = 0
         for data in tqdm(r.iter_content(block_size), total=math.ceil(total_size // block_size),
                          unit='MB', unit_scale=True):
@@ -68,13 +78,13 @@ def _get_checkpoint_dir():
             raise Exception("Download interrupted")
 
         f.seek(0)
-        print("Uncompressing the model to %s..."%checkpoint_dir)
+        LGR.info('Uncompressing the model to %s...'.format(checkpoint_dir))
         tarfile = TarFile(fileobj=LZMAFile(f), mode="r")
         tarfile.extractall(dirs.user_data_dir)
     return checkpoint_dir
 
 
-@due.dcite(Doi('10.7490/f1000research.1116395.1'),
+@due.dcite(references.PEAKS2MAPS,
            description='Transforms coordinates of peaks to unthresholded maps using a deep '
                        'convolutional neural net.')
 def peaks2maps(contrasts_coordinates, skip_out_of_bounds=True,
@@ -98,7 +108,7 @@ def peaks2maps(contrasts_coordinates, skip_out_of_bounds=True,
     """
     try:
         import tensorflow as tf
-    except ModuleNotFoundError as e:
+    except ImportError as e:
         if "No module named 'tensorflow'" in str(e):
             raise Exception("tensorflow not installed - see https://www.tensorflow.org/install/ "
                             "for instructions")
@@ -122,7 +132,6 @@ def peaks2maps(contrasts_coordinates, skip_out_of_bounds=True,
         return iterator.get_next()
 
     model_dir = _get_checkpoint_dir()
-    print("begin inference")
     model = tf.estimator.Estimator(model_fn, model_dir=model_dir)
 
     results = model.predict(generate_input_fn)
@@ -158,27 +167,32 @@ def compute_ma(shape, ijk, kernel):
     """
     ma_values = np.zeros(shape)
     mid = int(np.floor(kernel.shape[0] / 2.))
+    mid1 = mid + 1
     for j_peak in range(ijk.shape[0]):
         i, j, k = ijk[j_peak, :]
-        xl = max(i-mid, 0)
-        xh = min(i+mid+1, ma_values.shape[0])
-        yl = max(j-mid, 0)
-        yh = min(j+mid+1, ma_values.shape[1])
-        zl = max(k-mid, 0)
-        zh = min(k+mid+1, ma_values.shape[2])
+        xl = max(i - mid, 0)
+        xh = min(i + mid1, ma_values.shape[0])
+        yl = max(j - mid, 0)
+        yh = min(j + mid1, ma_values.shape[1])
+        zl = max(k - mid, 0)
+        zh = min(k + mid1, ma_values.shape[2])
         xlk = mid - (i - xl)
         xhk = mid - (i - xh)
         ylk = mid - (j - yl)
         yhk = mid - (j - yh)
         zlk = mid - (k - zl)
         zhk = mid - (k - zh)
-        if all(np.array([xl, xh, yl, yh, zl, zh, xlk, xhk, ylk, yhk, zlk, zhk]) >= 0):
-            ma_values[xl:xh, yl:yh, zl:zh] = np.maximum(ma_values[xl:xh, yl:yh, zl:zh],
-                                                        kernel[xlk:xhk, ylk:yhk, zlk:zhk])
+
+        if ((xl >= 0) & (xh >= 0) & (yl >= 0) & (yh >= 0) & (zl >= 0) &
+                (zh >= 0) & (xlk >= 0) & (xhk >= 0) & (ylk >= 0) & (yhk >= 0) &
+                (zlk >= 0) & (zhk >= 0)):
+            ma_values[xl:xh, yl:yh, zl:zh] = np.maximum(
+                ma_values[xl:xh, yl:yh, zl:zh],
+                kernel[xlk:xhk, ylk:yhk, zlk:zhk])
     return ma_values
 
 
-@due.dcite(Doi('10.1002/hbm.20718'),
+@due.dcite(references.ALE_KERNEL,
            description='Introduces sample size-dependent kernels to ALE.')
 def get_ale_kernel(img, n=None, fwhm=None):
     """
@@ -190,12 +204,12 @@ def get_ale_kernel(img, n=None, fwhm=None):
     elif n is None and fwhm is None:
         raise ValueError('Either n or fwhm must be provided')
     elif n is not None:
-        uncertain_templates = (5.7/(2.*np.sqrt(2./np.pi)) * \
-                               np.sqrt(8.*np.log(2.)))  # pylint: disable=no-member
+        uncertain_templates = (5.7 / (2. * np.sqrt(2. / np.pi)) *
+                               np.sqrt(8. * np.log(2.)))  # pylint: disable=no-member
         # Assuming 11.6 mm ED between matching points
-        uncertain_subjects = (11.6/(2*np.sqrt(2/np.pi)) * \
-                              np.sqrt(8*np.log(2))) / np.sqrt(n)  # pylint: disable=no-member
-        fwhm = np.sqrt(uncertain_subjects**2 + uncertain_templates**2)
+        uncertain_subjects = (11.6 / (2 * np.sqrt(2 / np.pi)) *
+                              np.sqrt(8 * np.log(2))) / np.sqrt(n)  # pylint: disable=no-member
+        fwhm = np.sqrt(uncertain_subjects ** 2 + uncertain_templates ** 2)
 
     fwhm_vox = fwhm / np.sqrt(np.prod(img.header.get_zooms()))
     sigma_vox = fwhm_vox * np.sqrt(2.) / (np.sqrt(2. * np.log(2.)) * 2.)  # pylint: disable=no-member
@@ -208,6 +222,6 @@ def get_ale_kernel(img, n=None, fwhm=None):
     # Crop kernel to drop surrounding zeros
     mn = np.min(np.where(kernel > np.spacing(1))[0])
     mx = np.max(np.where(kernel > np.spacing(1))[0])
-    kernel = kernel[mn:mx+1, mn:mx+1, mn:mx+1]
+    kernel = kernel[mn:mx + 1, mn:mx + 1, mn:mx + 1]
     mid = int(np.floor(data.shape[0] / 2.))
     return sigma_vox, kernel

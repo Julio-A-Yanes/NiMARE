@@ -2,11 +2,17 @@
 Top-level namespace for nimare base.
 """
 
-from .inputs import (Analyzable, Mappable, ConnMatrix, Image, CoordinateSet,
-                     Surface)
+from .base import MetaResult
 from .decode import Decoder
-from .meta import (MetaResult, MetaEstimator, CBMAEstimator, KernelEstimator,
-                   IBMAEstimator)
-from .annotate import (AnnotationModel)
-from .misc import (Parcellator)
-from .data import Study, Contrast
+from .meta import KernelTransformer, CBMAEstimator, IBMAEstimator
+from .annotate import AnnotationModel
+from .misc import Parcellator
+
+__all__ = ['Decoder',
+           'KernelTransformer',
+           'CBMAEstimator',
+           'IBMAEstimator',
+           'MetaResult',
+           'AnnotationModel',
+           'Parcellator'
+           ]

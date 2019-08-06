@@ -2,14 +2,21 @@
 NiMARE: Neuroimaging Meta-Analysis Research Environment
 """
 import warnings
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 with warnings.catch_warnings(record=True) as w:
     warnings.simplefilter("ignore")
-    from .dataset import Dataset
-    from .meta import cbma
-    from .annotate import text
-    from .decode import gclda_decode_roi
-    from .parcellate import CoordCBP
+    from . import base
+    from . import dataset
+    from . import meta
+    from . import correct
+    from . import resources
+    from . import io
+    from . import stats
+    from . import utils
     from .version import __version__
 
-    del cbma, Dataset, text, gclda_decode_roi, CoordCBP
+    __all__ = ['base', 'dataset', 'meta', 'correct', 'resources', 'io',
+               'stats', 'utils', '__version__']
